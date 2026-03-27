@@ -1,0 +1,59 @@
+# Dependencies
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+pipenv/
+# Virtual environments
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Logs
+logs/
+*.log
+
+# Build/Dist
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Data & Heavy Folders
+data/
+downloads/
+Ebooks/
+backups/
+backup/
+tools/
+prompts/
+output/
+docs/archive/
+test_gemini_cli/
+.antigravitykit/
+.Antigravity/
+.claude/
+.cursorrules/
+
+# Profiling & Cache
+.ruff_cache/
+profile.json
+profile.out
+profile.svg
+scalene-profile.json
+*.tmp
+*.temp

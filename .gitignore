@@ -1,0 +1,99 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/*.log
+logs/*.log.*
+src/preprocessing/logs/*.log
+src/preprocessing/logs/*.log.*
+
+# Temporary files
+temp/
+*.tmp
+*.temp
+
+# Data files (keep structure but ignore content)
+data/progress/*.txt
+data/cache/
+data/output/**
+data/reports/**
+!data/output/.gitkeep
+!data/reports/.gitkeep
+data/metrics.json
+data/metrics*.json
+
+# Backup files
+*.backup
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+demo_metadata_output/
+test_metadata_output/
+new 1.txt
+code constructor.txt
+Ebooks/
+backups/
+backup/
+tools/
+output/
+test_gemini_cli/
+.antigravitykit/
+.Antigravity/
+.claude/
+.cursorrules/
+*.out
+*.svg
+scalene-profile.json
+profile.json
+logs_test/
+test_*.txt
+error.txt
+dummy.txt
+
+# Secrets / local runtime config
+config/config.yaml
+config/config.local.yaml
+config/config.smoke_*.yaml
+config/*.secrets.yaml
+config/*.backup*
+*.env
+*.env.*
+data/input/*_extracted/
+
+# Local agent/editor artifacts
+.cursor/
+.agent/

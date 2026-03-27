@@ -1,0 +1,38 @@
+# Large directories
+venv/
+.venv/
+data/
+data/input/
+data/output/
+data/cache/
+data/metadata/
+logs/
+.git/
+
+# Node modules
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Project Specific
+Ebooks/
+backups/
+backup/
+tools/
+prompts/
+.Antigravity/
+.antigravitykit/
+.ruff_cache/
+.pytest_cache/
+profile.json
+profile.out
+profile.svg
+scalene-profile.json

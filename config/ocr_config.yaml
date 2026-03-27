@@ -1,0 +1,146 @@
+# Minimal configuration for the standalone OCR app
+# Copy this file next to the executable under folder 'config' (config/ocr_config.yaml)
+# and pass it with --config if needed. The build script also embeds it by default.
+
+# === API KEYS CHO AI PROCESSING ===
+# API keys cho Google Gemini API (dùng cho AI Cleanup và Spell Check)
+# Nếu ai_cleanup.api_keys hoặc ai_spell_check.api_keys để trống, sẽ dùng các keys này
+# Thêm các API keys của bạn vào đây (mỗi key trên một dòng với dấu "- ")
+api_keys:
+  - "YOUR_GEMINI_API_KEY_HERE"
+  # Thêm các API keys của bạn vào đây
+
+# === SAFETY LEVEL (TÙY CHỌN) ===
+# Safety level mặc định cho toàn bộ AI processing nếu không được chỉ định trong ocr.safety_level
+# Các giá trị: "BLOCK_NONE", "BLOCK_ONLY_HIGH", "BLOCK_MEDIUM_AND_ABOVE", "BLOCK_LOW_AND_ABOVE"
+# Nếu để trống hoặc không có, mặc định là "BLOCK_ONLY_HIGH"
+# safety_level: "BLOCK_ONLY_HIGH"  # Uncomment và chỉnh sửa nếu cần
+
+ocr:
+  enabled: true
+  # Engine selection (currently tesseract only in the standalone bundle)
+  # Options: "tesseract"
+  engine: "tesseract"
+
+  # Path to Tesseract executable on Windows when NOT bundled.
+  # Example:
+  #   "C:/Program Files/Tesseract-OCR/tesseract.exe"
+  # If the EXE was built with vendors bundled, this can be omitted.
+  tesseract_cmd: "C:/Program Files/Tesseract-OCR/tesseract.exe"
+
+  # Poppler bin directory for PDF → image (Windows) when NOT bundled.
+  # Example:
+  #   "C:/Program Files/poppler-25.07.0/Library/bin"
+  # If the EXE was built with vendors bundled, this can be omitted.
+  poppler_path: "C:/Program Files/poppler-25.07.0/Library/bin"
+
+  # OCR languages (Tesseract lang packs must be installed accordingly)
+  # Format mới (2 ký tự - khuyến nghị): "VN" (tiếng Việt), "EN" (tiếng Anh), "CN" (tiếng Trung)
+  # Format cũ (backward compatible): "vie", "eng", "chi"
+  # Kết hợp: "VN+EN", "CN+EN" (kết hợp nhiều ngôn ngữ)
+  # Tiếng Trung: "CN" sẽ tự động detect giản thể/phồn thể, hoặc dùng "chi_sim"/"chi_tra" để chỉ định rõ
+  # LƯU Ý: Auto-detect ngôn ngữ đã bị loại bỏ do kém hiệu quả. Vui lòng chỉ định rõ ngôn ngữ.
+  # Ví dụ: "VN", "EN", "CN", "VN+EN", "CN+EN"
+  lang: "CN"
+
+  # Page Segmentation Mode for Tesseract
+  # 3: Fully automatic page segmentation
+  # 6: Assume a single uniform block of text
+  psm: 3
+
+  # DPI used to rasterize PDF pages before OCR
+  # Khuyến nghị: 200-250 cho hầu hết trường hợp, 300 cho văn bản chất lượng thấp
+  # DPI cao hơn = chất lượng tốt hơn nhưng chậm hơn và tốn RAM/disk nhiều hơn
+  dpi: 350  # Giảm từ 300 → 250 để tối ưu memory và tốc độ (đã đủ cho OCR)
+
+  # === TỐI ƯU RENDERING ===
+  # Format ảnh lưu cache: "jpeg" (nhỏ hơn ~60-70%) hoặc "png" (lossless nhưng lớn hơn)
+  # JPEG được khuyến nghị vì giảm đáng kể RAM và disk usage mà vẫn đủ chất lượng cho OCR
+  image_format: "jpeg"  # "jpeg" hoặc "png"
+  jpeg_quality: 85      # 85-90 là optimal cho OCR (balance giữa size và quality)
+
+  # Batch size khi render PDF: số trang render mỗi lần
+  # Nhỏ hơn = ít RAM hơn nhưng chậm hơn một chút (do overhead)
+  # Lớn hơn = nhanh hơn nhưng tốn RAM nhiều hơn
+  # Khuyến nghị: 10-30 tùy RAM máy (máy 8GB → 10-15, máy 16GB+ → 20-30)
+  render_batch_size: 10  # Render tối đa 10 trang/batch
+
+  # Memory optimization: giải phóng memory ngay sau khi save từng image
+  # true: giảm RAM usage đáng kể nhưng có thể chậm hơn chút ít (khuyến nghị)
+  # false: giữ images trong memory cho đến khi xong batch (nhanh hơn nhưng tốn RAM)
+  memory_optimize: true  # Khuyến nghị: true
+  
+  # Filter images khi extract từ PDF scan:
+  # Loại bỏ các images có kích thước quá lớn (background scan) để chỉ giữ lại các images nhỏ (biểu tượng)
+  # max_image_area_ratio: Tỷ lệ diện tích tối đa (so với trang) để giữ lại image
+  #   - 0.8 (80%): Loại bỏ images gần bằng hoặc bằng toàn bộ trang (background scan)
+  #   - 0.5 (50%): Chỉ giữ images nhỏ hơn nửa trang
+  #   - 0.3 (30%): Chỉ giữ images nhỏ (ví dụ: chỉ các biểu tượng quẻ dịch)
+  # Khuyến nghị: 0.7-0.8 cho hầu hết trường hợp (PDF scan có background image lớn)
+  max_image_area_ratio: 0.8  # Bỏ qua images > 80% diện tích trang
+
+  # === OPENCV IMAGE DETECTION (SCANNED PDF) ===
+  use_opencv_for_image_detection: true  # Sử dụng OpenCV để detect images từ scanned PDF (khi PyMuPDF không detect được)
+  # OpenCV sử dụng contour detection và edge detection để phát hiện các vùng hình ảnh trong scanned pages
+  # Chỉ chạy khi PyMuPDF không detect được images hoặc sau filter không còn images
+  # Yêu cầu: opencv-python package
+
+  # Show progress bar for multi-page PDFs (requires tqdm)
+  show_progress: true
+  # Tần suất log tiến độ định kỳ (giây) - dùng khi không có tqdm hoặc cần log chi tiết
+  progress_log_interval_seconds: 60
+
+  # Tự động phát hiện PDF scan vs text-based để tối ưu
+  # true: tự động detect và chọn phương pháp tối ưu (text extraction nhanh hơn OCR)
+  # false: luôn dùng OCR (chậm hơn nhưng đảm bảo)
+  auto_detect_pdf_type: true
+
+  # Safety Level cho AI Cleanup và Spell Check:
+  # Kiểm soát mức độ chặn nội dung bởi Google Gemini API safety filters.
+  # Các giá trị hợp lệ:
+  #   - "BLOCK_NONE": Không chặn gì cả (khuyến nghị cho văn bản có nội dung nhạy cảm)
+  #   - "BLOCK_ONLY_HIGH": Chỉ chặn nội dung nguy hiểm cao (mặc định, cân bằng)
+  #   - "BLOCK_MEDIUM_AND_ABOVE": Chặn nội dung mức trung bình trở lên
+  #   - "BLOCK_LOW_AND_ABOVE": Chặn tất cả nội dung có nguy hiểm (nghiêm ngặt nhất)
+  # Lưu ý: Với "BLOCK_NONE": AI sẽ không bị block bởi PROHIBITED_CONTENT, phù hợp cho văn bản học thuật/nghiên cứu
+  safety_level: "BLOCK_NONE"  # Khuyến nghị: "BLOCK_ONLY_HIGH" hoặc "BLOCK_NONE" để tránh block không mong muốn
+
+  # AI Cleanup: Sử dụng AI để dọn rác text (header/footer, noise từ scan...)
+  ai_cleanup:
+    enabled: true  # Bật/tắt AI cleanup
+    # API keys cho AI cleanup (có thể dùng chung với api_keys hoặc riêng)
+    # Nếu để trống, sẽ dùng api_keys từ section api_keys ở đầu config.yaml
+    api_keys: []  # Ví dụ: ["key1", "key2", ...]
+    model: "gemini-2.5-flash"  # Model AI: "gemini-2.5-flash" (mặc định) hoặc "gemini-2.5-pro"
+    max_parallel_workers: 3   # Số lượng chunks xử lý song song (giảm để tránh timeout)
+    chunk_size: 10000          # Kích thước chunk (characters) để chia nhỏ text dài (giảm để xử lý nhanh hơn)
+    delay_between_requests: 2.0  # Delay giữa các request (giây) (tăng để tránh rate limit)
+    max_retries: 3             # Số lần retry khi gặp lỗi
+    ai_timeout_seconds: 240   # Timeout cho mỗi request AI (giây) - tăng để tránh timeout với chunks lớn
+    auto_retry_failed: true   # Tự động retry các chunks failed ở cuối tiến trình
+    
+    # === AI-ENHANCED HEADER/FOOTER DETECTION ===
+    use_ai_header_footer_detection: true  # Sử dụng AI để phân tích và xóa header/footer (phân tích pattern lặp lại giữa các trang)
+    # AI sẽ phân tích toàn bộ document để tìm pattern lặp lại, hiệu quả hơn pattern matching đơn thuần
+    
+    # === AI VISION FOR IMAGE DETECTION (PDF SCAN) ===
+    use_vision_for_image_detection: true  # Sử dụng AI Vision để phân tích layout và xác định vị trí ảnh trong PDF scan
+    vision_model: "gemini-2.5-pro"  # Model cho vision task (khuyến nghị: gemini-2.5-pro cho độ chính xác cao)
+    # Lưu ý: Tính năng này yêu cầu gemini-2.5-pro (hỗ trợ vision), tốn nhiều API calls và chậm hơn
+    # Chỉ bật khi cần độ chính xác cao cho việc chèn ảnh vào text (ví dụ: quẻ dịch)
+  
+  # AI Spell Check & Paragraph Restoration: Soát lỗi chính tả và phục hồi cấu trúc paragraph
+  ai_spell_check:
+    enabled: true  # Bật/tắt AI spell check và paragraph restoration
+    # API keys cho AI spell check (có thể dùng chung với api_keys hoặc riêng)
+    # Nếu để trống, sẽ dùng api_keys từ section api_keys ở đầu config.yaml
+    api_keys: []  # Ví dụ: ["key1", "key2", ...]
+    model: "gemini-2.5-flash"  # Model AI: "gemini-2.5-flash" (mặc định) hoặc "gemini-2.5-pro"
+    max_parallel_workers: 3   # Số lượng chunks xử lý song song (giảm để tránh timeout)
+    chunk_size: 10000          # Kích thước chunk (characters) để chia nhỏ text dài (giảm để xử lý nhanh hơn)
+    delay_between_requests: 2.0  # Delay giữa các request (giây) (tăng để tránh rate limit)
+    max_retries: 3             # Số lần retry khi gặp lỗi
+    ai_timeout_seconds: 240   # Timeout cho mỗi request AI (giây) - tăng để tránh timeout với chunks lớn
+    auto_retry_failed: true   # Tự động retry các chunks failed ở cuối tiến trình
+
+

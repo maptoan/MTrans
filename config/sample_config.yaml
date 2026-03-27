@@ -1,0 +1,187 @@
+# ==============================================================================
+# SAMPLE CONFIG - BẢN MẪU TỐI GIẢN ĐỂ TEST NHANH
+# ------------------------------------------------------------------------------
+# Mục tiêu:
+# - Giúp chạy thử pipeline nhanh sau khi fork dự án
+# - Ưu tiên dễ hiểu, ít tham số, dễ chỉnh
+#
+# Cách dùng:
+# 1) Copy file này thành config riêng (ví dụ: config/config.local.yaml)
+# 2) Điền API key thật
+# 3) Sửa các đường dẫn input/metadata/output cho đúng máy bạn
+# 4) Chạy: python main.py --config config/config.local.yaml
+# ==============================================================================
+
+# --- 1) API KEYS ---
+# Điền ít nhất 1 key hợp lệ. Có thể thêm nhiều key để xoay vòng.
+api_keys:
+  - "YOUR_GEMINI_API_KEY_HERE"
+
+# ------------------------------------------------------------------------------
+# TRƯỜNG HỢP CHỈ DÙNG 1 API KEY (FREE TIER)
+# ------------------------------------------------------------------------------
+# Chương trình vẫn chạy bình thường, nhưng để ổn định nên dùng cấu hình bảo thủ:
+# - performance.max_parallel_workers: 1
+# - performance.max_concurrent_requests: 1
+# - performance.max_requests_per_minute_per_key: 5 (an toàn) đến 8 (nhanh hơn)
+# - performance.min_delay_between_requests: 8.0 - 12.0 giây
+#
+# Gợi ý nhanh (safe):
+#   max_parallel_workers: 1
+#   max_concurrent_requests: 1
+#   max_requests_per_minute_per_key: 5
+#   min_delay_between_requests: 12.0
+#
+# Nếu gặp 429/quota liên tục:
+# - giảm max_requests_per_minute_per_key
+# - tăng min_delay_between_requests
+# - giữ worker = 1
+# ------------------------------------------------------------------------------
+
+# --- 2) MODEL MAPPING ---
+# Nếu chưa cần tinh chỉnh, giữ nguyên toàn bộ về cùng 1 model.
+# Bản sample ưu tiên model nhanh để test luồng.
+# Gợi ý:
+# - gemini-2.5-flash hoặc gemini-3-flash-preview: chất lượng cao hơn, ổn định cho chunk lớn
+# - gemini-3.1-flash-lite-preview: tiết kiệm hơn, vẫn đủ tốt cho đa số batch
+models:
+  default: "gemini-2.5-flash"
+  flash: "gemini-2.5-flash"
+  pro: "gemini-2.5-flash"
+  validator: "gemini-2.5-flash"
+  ocr: "gemini-2.5-flash"
+  vision: "gemini-2.5-flash"
+  cleanup: "gemini-2.5-flash"
+  metadata: "gemini-2.5-flash"
+
+# --- 3) INPUT ---
+# Đường dẫn file nguồn cần dịch (txt/epub/docx/pdf).
+# Nên dùng path tương đối theo project root.
+input:
+  novel_path: "data/input/sample_test.txt"
+
+# --- 4) METADATA ---
+# document_type ảnh hưởng prompt dịch:
+# - novel: tiểu thuyết
+# - general: tài liệu thường
+# - technical_doc / academic_paper / medical... cho tài liệu chuyên ngành
+metadata:
+  document_type: "novel"
+  # novel_genre giúp tinh chỉnh văn phong khi document_type=novel
+  novel_genre: "huyền huyễn"
+  # 3 file metadata cốt lõi:
+  # - style_profile.json: phong cách dịch
+  # - glossary.csv: thuật ngữ bắt buộc
+  # - character_relations.csv: xưng hô/quan hệ nhân vật
+  style_profile_path: "data/metadata/sample/style_profile.json"
+  glossary_path: "data/metadata/sample/glossary.csv"
+  character_relations_path: "data/metadata/sample/character_relations.csv"
+
+# --- 5) OUTPUT ---
+# output_path: thư mục lưu kết quả
+# formats: danh sách định dạng đầu ra (txt/docx/epub/pdf)
+output:
+  output_path: "data/output/sample_test/"
+  formats: ["txt"]
+  filename_template: "{novel_name}_translated"
+  # auto_convert_epub: tự convert EPUB sau khi dịch xong
+  auto_convert_epub: false
+  # pipeline_format: để "txt" cho test nhanh, ít rủi ro định dạng
+  pipeline_format: "txt"
+  styles:
+    # Có thể để mặc định; chỉ cần chỉnh khi bạn có template riêng
+    docx_template: "data/templates/reference.docx"
+    epub_css: "data/templates/epub.css"
+    pdf_css: "data/templates/epub.css"
+  # pdf_engine: xelatex phù hợp văn bản đa ngôn ngữ
+  pdf_engine: "xelatex"
+
+# --- 6) PREPROCESSING ---
+# force_encoding: utf-8 là lựa chọn an toàn cho test cơ bản
+preprocessing:
+  force_encoding: 'utf-8'
+  chunking:
+    # max_chunk_tokens:
+    # - 7k-9k: tối ưu free-tier (giảm số request mạnh)
+    # - 2k-4k: dùng khi cần debug chất lượng từng đoạn
+    max_chunk_tokens: 9000
+    # adaptive_mode=true: tự điều chỉnh kích thước chunk theo nội dung
+    adaptive_mode: false
+    # safety_ratio: giảm biên để tránh vượt ngưỡng model
+    safety_ratio: 0.9
+    # use_markers: bật để tăng kiểm soát khớp chunk khi debug
+    use_markers: true
+    marker_format: "simple"
+    # enable_balancing: bật để giảm chunk lẻ, tiết kiệm thêm lượt request
+    enable_balancing: true
+    # Nếu codebase có hỗ trợ 2 tham số này, dùng để ép chunk gần ngưỡng tối ưu:
+    target_utilization: 0.85
+    min_utilization: 0.75
+
+# --- 7) TRANSLATION ---
+# Bản mẫu dùng flash_only + tắt các pass hậu kỳ để chạy nhanh.
+translation:
+  use_new_sdk: true
+  router:
+    # 101 = luôn dùng flash (vì complexity score không vượt 100)
+    complexity_threshold: 101
+  strategy: "flash_only"
+  model_strategy: "flash_only"
+  qa_editor:
+    enabled: false # Bật true khi cần hậu kiểm chất lượng kỹ hơn
+  default_model: "flash"
+  # context_window_size:
+  # - 1: nhanh, ít token
+  # - >1: giữ mạch tốt hơn nhưng tốn token
+  context_window_size: 1
+  enable_cache: false # Tắt cache cho test nhỏ để dễ quan sát
+  enable_final_cleanup_pass: false # Tắt cleanup pass để rút ngắn thời gian
+  context_caching:
+    # Gemini context caching: bật khi chạy dài để tiết kiệm token
+    enabled: false
+
+# --- 8) STORAGE ---
+# progress_path/cache_path nên tách riêng cho từng bộ test.
+storage:
+  progress_path: "data/progress/sample/"
+  cache_path: "data/cache/sample/"
+  caching_enabled: false
+
+# --- 9) LOGGING ---
+# Gợi ý:
+# - log_level INFO cho chạy thường
+# - DEBUG khi cần truy vết lỗi
+logging:
+  log_dir: "logs"
+  log_level: "INFO"
+  console_level: "INFO"
+  file_level: "DEBUG"
+  enable_rotation: false
+  verbosity:
+    show_chunk_progress: true
+
+# --- 10) PERFORMANCE ---
+# Bản sample đặt bảo thủ để tránh lỗi quota/rate-limit khi test.
+performance:
+  # Preset free-tier nhiều key: cân bằng giữa tốc độ và an toàn rate-limit
+  max_parallel_workers: 3
+  # 7.5s/request ~= 8 RPM per key (safe sustained)
+  min_delay_between_requests: 7.5
+  # Global cap nên đặt ~= active_keys * max_requests_per_minute_per_key
+  max_requests_per_minute: 240
+  # Nếu config loader hỗ trợ per-key limit, nên bật luôn để khóa chặt burst
+  max_requests_per_minute_per_key: 8
+  max_concurrent_requests: 3
+  validate_api_keys_on_startup: false
+  use_optimized_key_workflow: true
+
+# --- 11) KEY MANAGEMENT ---
+# Tỉ lệ phân bổ key theo vai trò.
+# Ở sample chỉ dịch => translation 100%, editor/reserve 0%.
+key_management:
+  use_smart_distributor: true
+  key_borrowing_enabled: true
+  ratios:
+    translation: 1.0
+    editor: 0.0
+    reserve: 0.0

@@ -1,0 +1,48 @@
+pytesseract>=0.3.10
+pdf2image>=1.17.0
+Pillow>=10.0.0
+PyYAML>=6.0.1
+# Core Google Generative AI SDK
+# SDK mới (khuyến nghị): google-genai
+google-genai>=0.2.0
+# SDK cũ (fallback): google-generativeai
+google-generativeai
+
+# Data handling and CSV parsing
+pandas
+
+# YAML configuration file parsing
+PyYAML
+
+# Character encoding detection
+chardet
+
+# Progress bars for CLI
+tqdm
+
+# EPUB file format handling
+ebooklib
+beautifulsoup4
+
+# DOCX file format handling
+python-docx
+
+# PDF file format handling
+PyPDF2
+pdfplumber>=0.9.0  # Preferred for text extraction from PDF (used by OCR module)
+PyMuPDF>=1.23.0,<1.26.5  # For extracting images from PDF (used by OCR module for DOCX output). Limited to <1.26.5 for pdf2docx compatibility
+
+# Image processing and detection (used by OCR module)
+opencv-python>=4.8.0  # OpenCV for image detection in scanned PDFs
+
+# DOCX to EPUB conversion wrapper
+pypandoc
+
+# PDF to DOCX conversion for hybrid workflow
+pdf2docx>=0.5.0
+
+# OCR for scanned PDFs (fallback when pdf2docx fails)
+ocrmypdf>=15.0.0
+
+# Colored logging for the console
+colorlog
