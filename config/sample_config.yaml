@@ -99,7 +99,35 @@ output:
 # --- 6) PREPROCESSING ---
 # force_encoding: utf-8 là lựa chọn an toàn cho test cơ bản
 preprocessing:
+  # strategy:
+  # - legacy: giữ đúng hành vi cũ
+  # - ai_ready_balanced: bật StructuredIR + AI pre-clean mức cân bằng
+  # - ocr_heavy: ưu tiên OCR + cleanup mạnh cho tài liệu scan
+  # - layout_strict: ưu tiên giữ layout (đặc biệt EPUB)
+  strategy: "legacy"
   force_encoding: 'utf-8'
+  structured_ir:
+    # Bật để parser sinh semantic blocks nội bộ cho chunking theo heading/block.
+    enabled: false
+  semantic_enrichment:
+    # Nhánh enrichment nội bộ (mặc định tắt để không tăng chi phí).
+    enabled: false
+  scan_pdf_markdown_after_cleanup:
+    # Chỉ áp dụng cho PDF scan-based, sau khi OCR + cleanup + spell-check hoàn tất.
+    # Mặc định OFF để tránh regression cho dữ liệu OCR còn nhiễu.
+    enabled: false
+    # Cổng kiểm tra chất lượng OCR trước khi markdown hóa:
+    min_chars: 800
+    min_avg_line_length: 24.0
+    max_short_line_ratio: 0.55
+    max_noisy_line_ratio: 0.25
+    # Gợi ý:
+    # - Bật khi OCR scan đã tương đối sạch, nhiều heading/list.
+    # - Nếu thấy markdown ra "xấu", tắt lại để fallback plain text.
+  cleaning:
+    # safe | aggressive | domain_technical
+    # domain_technical: giữ URL/email để tránh mất reference quan trọng.
+    profile: "safe"
   chunking:
     # max_chunk_tokens:
     # - 7k-9k: tối ưu free-tier (giảm số request mạnh)

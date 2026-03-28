@@ -19,6 +19,7 @@ import ebooklib
 import PyPDF2
 from bs4 import BeautifulSoup
 from ebooklib import epub
+from src.preprocessing.structured_ir import build_structured_ir_from_text
 
 logger = logging.getLogger("NovelTranslator")
 
@@ -355,6 +356,15 @@ class AdvancedFileParser:
                 "text": text,
                 "metadata": metadata,
                 "format": file_ext[1:],  # Remove dot
+                "structured_ir": (
+                    build_structured_ir_from_text(text)
+                    if (
+                        ((self.config.get("preprocessing") or {}).get("structured_ir") or {}).get(
+                            "enabled", False
+                        )
+                    )
+                    else None
+                ),
             }
 
         except FileParsingError as e:

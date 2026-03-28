@@ -16,12 +16,13 @@
 - **Quality:** Phải đạt 100% Checklist mới được phép commit.
 
 ## 🔄 Active Status (Trang thai hien tai)
-- **Last Task:** Thiết kế & triển khai workflow master.html (EPUB layout + HTML heading-based).
-- **Current Pipeline:** v9.2 (Unified Layout & Quality) - Unicode Optimized.
-- **Active Issues:** Không.
-- **Phien ban hien tai:** v9.2 (2026-03-19) - STABLE
+- **Last Task:** Handover 2026-03-28 — Structured IR chunking tuân `max_effective_tokens` + benchmark ScienceOfRunning.pdf.
+- **Current Pipeline:** v9.5 docs baseline + chunk IR cap (preprocessing).
+- **Active Issues:** Full pytest vẫn có fail sẵn (async/legacy); chunk subset OK.
+- **Phien ban hien tai:** v9.5 (docs) + Unreleased chunk IR fix
 
 ## 🧠 Shared Memory (Ghi nho cho cac Agent)
+- [2026-03-28] **Chia chunk IR**: Không để mảnh quá dài; markdown sau OCR chỉ hợp PDF quét; PDF nhiều cột/chữ trong ảnh cần xử lý riêng (OCR/xuất file).
 - [2026-03-19] **v9.2 Stable**: Unified layout (Tables/Headings/Images) & Quality Audit for English sources.
 - [2026-02-26] **v8.3 Stable**: Workflow optimization, enable final_cleanup_pass, residual_cleanup.py fix.
 - [2026-02-24] **Documentation Sync**: Cap nhat dong bo PROJECT_CONTEXT.md, CHANGELOG.md len v8.2.

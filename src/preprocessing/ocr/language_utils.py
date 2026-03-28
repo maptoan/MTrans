@@ -146,13 +146,16 @@ def _resolve_language(
     Auto-detect ngôn ngữ đã được loại bỏ do kém hiệu quả.
 
     Args:
-        lang: Normalized language string (từ _normalize_lang_code)
+        lang: Language string từ config (VD: EN, VN, vie+eng) — luôn được đưa qua
+            _normalize_lang_code trước khi gọi Tesseract (file .traineddata là eng không phải EN).
         ocr_cfg: Config dictionary
         sample_img: Optional sample image for Chinese variant detection
 
     Returns:
         Resolved language string cho Tesseract (e.g., "chi_sim", "chi_tra", "vie+eng")
     """
+    lang = _normalize_lang_code(lang)
+
     # Xử lý combined languages (e.g., "vie+eng")
     if "+" in lang:
         parts = lang.split("+")

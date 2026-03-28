@@ -2,6 +2,21 @@
 
 ### **Cải tiến / Sửa lỗi:**
 
+- ✅ **OCR PDF scan — ổn định bộ nhớ và mã ngôn ngữ Tesseract:**
+  - Render **từng trang** ra thư mục tạm trên đĩa (`pdf2image` + `paths_only=True`), OCR xong xóa file — tránh `MemoryError` khi Poppler ghi toàn bộ ảnh ra stdout (PDF dày trang).
+  - `convert_pdf_with_ocrmypdf`: không capture stdout vô hạn vào RAM.
+  - `_resolve_language` luôn gọi `_normalize_lang_code` trước — `EN`/`VN` trong config map đúng sang `eng`/`vie` (file `.traineddata` của Tesseract).
+  - Config: `ocr.pdf_ocr_progress_every`, dùng `ocr.image_format` / `ocr.jpeg_quality` cho ảnh trung gian.
+  - Test: `tests/test_ocr_pdf_disk_render.py`, `tests/test_ocr_language_normalize.py`.
+
+- ✅ **Structured IR — không còn mảnh dịch quá lớn:**
+  - Cắt thêm khi đoạn không có chỗ ngắt câu rõ (thường gặp PDF kỹ thuật).
+  - Rà lại trước khi trả về để mỗi mảnh không vượt ngưỡng an toàn.
+  - Có test trong `tests/test_semantic_chunking.py`.
+
+- ✅ **GitHub publish:**
+  - Tạo commit đầu tiên và push lên `origin/master` (repo `maptoan/MTrans`).
+
 - ✅ **Marker guardrail gating (missing markers fix):**
   - Bật marker guardrail theo công thức `use_markers_config OR original_has_markers`.
   - Khi guardrail tắt: bỏ qua marker-first validation và không trigger vòng re-translation vì “thiếu marker” (tránh false-positive khi `use_markers=false`).

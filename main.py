@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
+from src.preprocessing.strategy_resolver import resolve_preprocessing_strategy
 from src.utils.api_key_validator import validate_api_keys
 from src.utils.custom_exceptions import ResourceExhaustedError
 from src.utils.logger import setup_main_logger
@@ -96,6 +97,8 @@ def main_sync() -> Optional[Tuple[Dict[str, Any], List[str]]]:
             raise FileNotFoundError(f"Không tìm thấy tệp cấu hình tại: {args.config}")
         with open(args.config, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
+        config["config_path"] = args.config
+        config = resolve_preprocessing_strategy(config)
 
         log_cfg = config.get("logging", {})
         logger_instance.setLevel(log_cfg.get("log_level", "INFO").upper())

@@ -1,9 +1,43 @@
 # Lịch Sử Hội Thoại - MTranslator Project
 
-**Last session:** 2026-03-27  
-**Branch:** marker-guardrail-gating (unreleased)  
-**Tests pass:** ✅ Subset tests pass (`tests/test_marker_guardrail_gating.py`, `tests/test_integration_master_txt_pipeline.py`, `tests/test_marker_subchunk_prompt_instruction.py`) + smoke runtime TXT/EPUB OK  
-**Next action:** Chạy lại `pytest` theo nhóm liên quan `translation/` + merge/finalize, sau đó chuẩn bị commit/PR cho đợt fix marker guardrail.
+**Last session:** 2026-03-28  
+**Branch:** `master` (máy bạn — push khi cần)  
+**Tests pass:** ✅ Phần test về chunk (semantic + hybrid) chạy được. Cả bộ `pytest` vẫn có chỗ lỗi cũ (dịch bất đồng bộ, thư mục legacy…) — **không** phải do sửa chunk lần này.  
+**Việc tiếp:** Push `origin` khi sẵn sàng; chạy `pytest` theo nhóm nếu cần.
+
+---
+
+## [2026-03-28] - Tài liệu + commit: OCR scan, Tesseract lang, DOCUMENTATION_INDEX
+
+**Trạng thái:** Đã cập nhật `CHANGELOG.md`, `PROJECT_CONTEXT.md`, `DOCUMENTATION_INDEX.md`; commit mã (OCR render đĩa, `EN`→`eng`, Structured IR, test).
+
+### **Nội dung docs**
+- CHANGELOG Unreleased: OCR PDF, Tesseract lang, test `test_ocr_*`.
+- PROJECT_CONTEXT: mục OCR scan PDF (bộ nhớ + mã ngôn ngữ).
+- DOCUMENTATION_INDEX: ngày 2026-03-28.
+
+---
+
+## [2026-03-28] - Chia chunk Structured IR + thử PDF mẫu
+
+**Trạng thái:** Xong phần code và thử file; có thể chưa commit.
+
+### **Đã làm**
+- **Chunk quá dài khi bật Structured IR:** Trước đây đôi khi một mảnh văn **quá lớn** so với giới hạn gửi AI. Đã thêm bước **cắt nhỏ theo độ dài** khi không có chỗ ngắt câu rõ (thường gặp với PDF). Cuối cùng vẫn **rà lại một lần** để không mảnh nào vượt ngưỡng an toàn (giống ý tưởng với nhánh chia chunk thông thường).
+- **Có test tự động** trong `tests/test_semantic_chunking.py` (một đoạn văn giả lập rất dài, kiểm tra mỗi chunk không vượt giới hạn).
+- **Thử file `ScienceOfRunning.pdf`:** Đọc PDF ~48 giây. Nhánh IR: **15** mảnh, mảnh lớn nhất **10200** (đúng trần), không mảnh nào vượt. Nhánh chia kiểu novel: **12** mảnh, có **2** mảnh hơi quá trần một chút. Nhánh IR tốn thêm vài giây để chia.
+
+### **Ghi chú thêm (chỉ giải thích, không sửa code trong phiên đó)**
+- **Markdown sau OCR** trong config chủ yếu dùng cho **PDF quét** (chữ lấy bằng OCR), không phải “bật là hay hơn” cho mọi PDF.
+- **PDF nhiều cột hoặc chữ nằm trong ảnh:** Cần tách bài toán — chữ copy được từ PDF thì trích bình thường; chữ nằm trong hình thì phải OCR/ảnh; cột lẫn nhau thì có khi phải xử lý ngoài (xuất Word, công cụ khác) rồi mới đưa vào dịch.
+
+### **Chưa xong / hạn chế**
+- Chưa chạy sạch toàn bộ `pytest`.
+- Chưa gắn bài thử PDF vào CI.
+
+### **Gợi ý bước sau**
+- Muốn hai nhánh chia chunk **đều** không vượt trần → chỉnh thêm nhánh novel/hybrid.
+- PDF khó đọc (cột, bảng) → cân nhắc xử lý file trước khi đưa vào tool.
 
 ---
 
@@ -65,6 +99,8 @@
   - Smoke EPUB (preserve_layout) chạy thành công, finalize + xuất EPUB OK.
   - Smoke TXT với `data/input/test.txt` + metadata `data/metadata/TDTTT/*`:
     - finalize/merge thành công và log xác nhận: “Marker guardrail tắt … bỏ qua marker-first validation.”
+ - **GitHub push (private repo):**
+   - Đã tạo **commit đầu tiên** và push lên `origin/master` (repo: `maptoan/MTrans`).
 
 ### **Pending/Blockers:**
 - Chưa chạy full test suite (pytest toàn bộ). Một số test legacy/khác có thể fail do môi trường hoặc phụ thuộc API.

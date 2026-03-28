@@ -80,6 +80,8 @@ def load_ocr_config(config_path: str = "config/config.yaml") -> Dict[str, Any]:
     ocr_cfg = cfg.get("ocr") or {}
     # Lưu config_path để dùng sau
     ocr_cfg["_config_path"] = config_path
+    # Keep preprocessing subtree for OCR post-processing decisions.
+    ocr_cfg["_preprocessing"] = cfg.get("preprocessing", {})
     # Lưu api_keys từ root config để dùng cho AI cleanup
     ocr_cfg["_root_api_keys"] = cfg.get("api_keys", [])
     # Lưu safety_level từ root config (nếu có) để dùng cho AI cleanup/spell check

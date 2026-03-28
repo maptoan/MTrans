@@ -491,6 +491,40 @@ class SmartChunker:
         logger.debug(f"Smart split: {len(sentences)} sentences từ paragraph dài")
         return sentences
 
+    def _split_text_to_token_limit(self, text: str, hard_limit: int) -> List[str]:
+        """
+        Split text into segments so each segment counts <= hard_limit tokens.
+
+        Used when a single sentence or run has no safe punctuation split (e.g. PDF
+        extraction) so _split_long_paragraph still yields one oversized unit.
+        """
+        if not text or not text.strip():
+            return []
+        rest = text.strip()
+        if self._count_tokens(rest) <= hard_limit:
+            return [rest]
+        out: List[str] = []
+        while rest:
+            if self._count_tokens(rest) <= hard_limit:
+                out.append(rest)
+                break
+            lo, hi = 1, len(rest)
+            best = 0
+            while lo <= hi:
+                mid = (lo + hi) // 2
+                if self._count_tokens(rest[:mid]) <= hard_limit:
+                    best = mid
+                    lo = mid + 1
+                else:
+                    hi = mid - 1
+            if best == 0:
+                out.append(rest[:1])
+                rest = rest[1:]
+            else:
+                out.append(rest[:best])
+                rest = rest[best:].lstrip()
+        return out
+
     def _split_chapters(self, text: str) -> List[Dict[str, Any]]:
         """
         [Phase 5.1] Tách văn bản thành các chapters dựa trên regex.
@@ -705,6 +739,55 @@ class SmartChunker:
         self._log_chunking_stats(final_chunks)
         return final_chunks
 
+    def chunk_from_structured_ir(self, blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Semantic-aware chunking from structured IR blocks.
+
+        Rules:
+        - Prefer heading boundaries.
+        - Fallback to paragraph accumulation by token limit.
+        """
+        if not blocks:
+            return []
+
+        grouped_sections: List[str] = []
+        current_lines: List[str] = []
+        for block in blocks:
+            block_type = (block.get("type") or "paragraph").strip().lower()
+            block_text = (block.get("text") or "").strip()
+            if not block_text:
+                continue
+
+            if block_type == "heading" and current_lines:
+                grouped_sections.append("\n".join(current_lines).strip())
+                current_lines = [block_text]
+            else:
+                current_lines.append(block_text)
+
+        if current_lines:
+            grouped_sections.append("\n".join(current_lines).strip())
+
+        chunks: List[Dict[str, Any]] = []
+        chunk_id = 0
+        for section in grouped_sections:
+            if not section.strip():
+                continue
+            section_tokens = self._count_tokens(section)
+            if section_tokens <= self.max_effective_tokens:
+                chunks.append(self._create_chunk_dict(chunk_id, section))
+                chunk_id += 1
+            else:
+                sub_chunks = self._chunk_by_paragraph_logic(
+                    section,
+                    start_chunk_id=chunk_id,
+                    hard_limit=self.max_effective_tokens,
+                )
+                chunks.extend(sub_chunks)
+                chunk_id += len(sub_chunks)
+        if not chunks:
+            return []
+        return self._cap_oversized_chunks(chunks)
+
     def _chunk_by_paragraph_logic(
         self, text: str, start_chunk_id: int, hard_limit: int
     ) -> List[Dict[str, Any]]:
@@ -736,24 +819,33 @@ class SmartChunker:
 
                 # Split paragraph dài
                 sentences = self._split_long_paragraph(para)
+                if not sentences:
+                    sentences = [para]
                 for sentence in sentences:
-                    sent_tokens = self._count_tokens(sentence)
-                    if (
-                        current_tokens + sent_tokens > hard_limit
-                        and current_chunk_paragraphs
-                    ):
-                        cache_key = self._create_join_cache_key(
-                            current_chunk_paragraphs
+                    if self._count_tokens(sentence) > hard_limit:
+                        sentence_units = self._split_text_to_token_limit(
+                            sentence, hard_limit
                         )
-                        chunk_text = self._join_paragraphs(
-                            current_chunk_paragraphs, cache_key
-                        )
-                        chunks.append(self._create_chunk_dict(chunk_id, chunk_text))
-                        chunk_id += 1
-                        current_chunk_paragraphs = []
-                        current_tokens = 0
-                    current_chunk_paragraphs.append(sentence)
-                    current_tokens += sent_tokens
+                    else:
+                        sentence_units = [sentence]
+                    for unit in sentence_units:
+                        sent_tokens = self._count_tokens(unit)
+                        if (
+                            current_tokens + sent_tokens > hard_limit
+                            and current_chunk_paragraphs
+                        ):
+                            cache_key = self._create_join_cache_key(
+                                current_chunk_paragraphs
+                            )
+                            chunk_text = self._join_paragraphs(
+                                current_chunk_paragraphs, cache_key
+                            )
+                            chunks.append(self._create_chunk_dict(chunk_id, chunk_text))
+                            chunk_id += 1
+                            current_chunk_paragraphs = []
+                            current_tokens = 0
+                        current_chunk_paragraphs.append(unit)
+                        current_tokens += sent_tokens
             else:
                 # Paragraph thường
                 if (

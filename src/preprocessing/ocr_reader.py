@@ -1120,6 +1120,19 @@ async def ocr_file(
     cleanup_all_chunks = cleanup_original_chunks if cleanup_original_chunks else []
     spell_check_all_chunks = spell_check_original_chunks if spell_check_original_chunks else []
 
+    markdown_postprocess = {"applied": False, "reason": "not_scan_pdf", "metrics": {}}
+    preprocessing_cfg = ocr_cfg.get("_preprocessing", {}) if isinstance(ocr_cfg, dict) else {}
+    scan_md_cfg = (preprocessing_cfg.get("scan_pdf_markdown_after_cleanup") or {})
+    if ext == ".pdf" and pdf_type == "scan":
+        from src.preprocessing.scan_markdown import maybe_markdownize_scan_text
+
+        text, markdown_postprocess = maybe_markdownize_scan_text(text, scan_md_cfg)
+        logger.info(
+            "Scan Markdown postprocess: applied=%s reason=%s",
+            markdown_postprocess.get("applied"),
+            markdown_postprocess.get("reason"),
+        )
+
     # Tự động lưu file cuối cùng nếu skip_completion_menu (được gọi từ workflow dịch)
     if output_path and skip_completion_menu:
         try:
@@ -1140,6 +1153,7 @@ async def ocr_file(
         "spell_check_failed_indices": spell_check_failed_indices,
         "spell_check_original_chunks": spell_check_original_chunks,
         "spell_check_all_chunks": spell_check_all_chunks,  # Tất cả chunks (để merge lại)
+        "markdown_postprocess": markdown_postprocess,
         "ocr_cfg": ocr_cfg,
     }
 
@@ -1519,6 +1533,7 @@ async def main_async():
             "spell_check_failed_indices": spell_check_failed_indices,
             "spell_check_original_chunks": spell_check_original_chunks,
             "spell_check_all_chunks": spell_check_original_chunks if spell_check_original_chunks else [],
+            "markdown_postprocess": {"applied": False, "reason": "resume_mode", "metrics": {}},
             "ocr_cfg": ocr_cfg,
         }
     else:

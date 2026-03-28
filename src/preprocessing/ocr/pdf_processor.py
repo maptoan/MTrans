@@ -4,6 +4,8 @@ from __future__ import annotations
 import gc
 import logging
 import os
+import shutil
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -162,7 +164,14 @@ def convert_pdf_with_ocrmypdf(pdf_path: str, output_path: str, ocr_cfg: dict, pa
     if pages:
         cmd.extend(["--pages", ",".join(map(str, pages))])
     try:
-        subprocess.run(cmd, check=True)
+        # Never capture huge stdout/stderr into RAM (long runs can trigger MemoryError in _readerthread).
+        subprocess.run(
+            cmd,
+            check=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=None,
+        )
         return output_path
     except Exception as e:
         logger.error(f"OCRmyPDF thất bại: {e}")
@@ -255,12 +264,35 @@ def extract_text_and_images_from_pdf(
     return [], 0
 
 
+def _normalize_pdf_ocr_page_list(
+    pdf_path: str,
+    pages: Optional[List[int]],
+    poppler_path: Optional[str],
+    userpw: Optional[str] = None,
+) -> List[int]:
+    """Return sorted unique 1-based page indices to OCR."""
+    from pdf2image import pdfinfo_from_path
+
+    info = pdfinfo_from_path(pdf_path, userpw=userpw, poppler_path=poppler_path)
+    total = int(info.get("Pages", 0))
+    if total < 1:
+        return []
+    if pages is not None:
+        if len(pages) == 0:
+            return []
+        return sorted({p for p in pages if 1 <= p <= total})
+    return list(range(1, total + 1))
+
+
 def ocr_pdf(
     pdf_path: str, config_path: str = "config/config.yaml", pages: Optional[List[int]] = None
 ) -> tuple[str, int]:
-    """OCR scan PDF bằng cách render sang ảnh và gọi OCR từng trang."""
-    # Logic render ảnh (pdf2image) và gọi OCR (pytesseract)
-    # Rút gọn từ bản gốc trong ocr_reader.py
+    """
+    OCR scan PDF: render each page to disk, then OCR one image at a time.
+
+    pdf2image without output_folder buffers Poppler stdout in memory; large
+    PDFs cause MemoryError. Per-page output_folder + paths_only avoids that.
+    """
     from PIL import Image
 
     from .config_loader import _detect_bundled_binaries, load_ocr_config
@@ -274,15 +306,67 @@ def ocr_pdf(
     if convert_from_path is None:
         raise PDFProcessorError("pdf2image chưa được cài đặt.")
 
-    dpi = ocr_cfg.get("dpi", 250)
-    # Render PDF pages
-    imgs = convert_from_path(
-        pdf_path, dpi=dpi, first_page=pages[0] if pages else None, last_page=pages[-1] if pages else None
-    )
+    poppler = ocr_cfg.get("poppler_path") or None
+    if poppler == "":
+        poppler = None
+    userpw = ocr_cfg.get("pdf_password") or ocr_cfg.get("userpw")
 
-    texts = []
-    for img in imgs:
-        text = _image_to_text(img, ocr_cfg)
-        texts.append(text)
+    dpi = int(ocr_cfg.get("dpi", 250) or 250)
+    fmt = str(
+        ocr_cfg.get("pdf_ocr_render_fmt") or ocr_cfg.get("image_format", "jpeg") or "jpeg"
+    ).lower()
+    if fmt not in ("jpeg", "jpg", "png", "ppm", "tiff", "tif"):
+        fmt = "jpeg"
+    if fmt == "jpg":
+        fmt = "jpeg"
+    q = int(ocr_cfg.get("jpeg_quality", 90) or 90)
+    jpegopt = {"quality": min(100, max(1, q)), "optimize": True}
 
-    return "\n\n".join(texts), len(imgs)
+    page_list = _normalize_pdf_ocr_page_list(pdf_path, pages, poppler, userpw=userpw)
+    if not page_list:
+        return "", 0
+
+    log_every = max(1, int(ocr_cfg.get("pdf_ocr_progress_pages", 25) or 25))
+    texts: List[str] = []
+    work_root = tempfile.mkdtemp(prefix="mtranslator_pdf_ocr_")
+
+    try:
+        for idx, page_num in enumerate(page_list):
+            page_dir = os.path.join(work_root, f"w{page_num:06d}")
+            os.makedirs(page_dir, exist_ok=True)
+            try:
+                image_paths: List[str] = convert_from_path(
+                    pdf_path,
+                    dpi=dpi,
+                    first_page=page_num,
+                    last_page=page_num,
+                    output_folder=page_dir,
+                    fmt=fmt,
+                    paths_only=True,
+                    thread_count=1,
+                    poppler_path=poppler,
+                    userpw=userpw,
+                    jpegopt=jpegopt if fmt == "jpeg" else None,
+                )
+                for img_path in image_paths:
+                    try:
+                        with Image.open(img_path) as im:
+                            text = _image_to_text(im, ocr_cfg)
+                            texts.append(text)
+                    finally:
+                        try:
+                            os.remove(img_path)
+                        except OSError:
+                            pass
+            finally:
+                shutil.rmtree(page_dir, ignore_errors=True)
+
+            if (idx + 1) % log_every == 0 or idx + 1 == len(page_list):
+                logger.info(f"OCR scan PDF: đã xử lý {idx + 1}/{len(page_list)} trang")
+
+            gc.collect()
+
+    finally:
+        shutil.rmtree(work_root, ignore_errors=True)
+
+    return "\n\n".join(texts), len(page_list)

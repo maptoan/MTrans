@@ -47,18 +47,19 @@ class NovelTranslator:
     def __init__(self, config: Dict[str, Any], valid_api_keys: List[str]):
         # Lazy imports for startup performance
         from src.preprocessing.chunker import SmartChunker
+        from src.preprocessing.strategy_resolver import resolve_preprocessing_strategy
         from src.translation.initialization_service import InitializationService
         from src.utils.quality_profile import apply_quality_profile
         from src.utils.translation_validator import TranslationValidator
 
-        self.config = apply_quality_profile(config)
+        self.config = resolve_preprocessing_strategy(apply_quality_profile(config))
         self.novel_path = self.config["input"]["novel_path"]
         self.novel_name = os.path.splitext(os.path.basename(self.novel_path))[0]
         self.valid_api_keys = valid_api_keys
         self._warm_up_completed = False
 
         # Phase 7: Initialization via Service
-        self.init_service = InitializationService(config)
+        self.init_service = InitializationService(self.config)
 
         # Sẽ được khởi tạo sau trong async.run hoặc setup_resources_async
         self.resources: Dict[str, Any] = {}
@@ -66,7 +67,7 @@ class NovelTranslator:
         self.metrics_collector = None
         self.error_handler = None
         self.model_router = None
-        self.chunker = SmartChunker(config)
+        self.chunker = SmartChunker(self.config)
         self.style_manager = None
         self.glossary_manager = None
         self.relation_manager = None
@@ -79,8 +80,6 @@ class NovelTranslator:
 
         self.worker_caches: Dict[str, str] = {}
 
-        self.worker_caches: Dict[str, str] = {}
-
         # Cache for compiled marker patterns (used in merge validation)
         self._marker_pattern_cache: Dict[int, Tuple[Any, Any]] = {}
 
@@ -88,7 +87,7 @@ class NovelTranslator:
         self._convert_utils_cache = None
 
         # Phase 3.1: Translation Validator
-        self.validator = TranslationValidator(config.get("validation", {}))
+        self.validator = TranslationValidator(self.config.get("validation", {}))
 
         # Phase 11: Batch QA issues collection
         self.batch_qa_issues = []
@@ -100,8 +99,8 @@ class NovelTranslator:
         self.cjk_cleaner = None
 
         # Legacy/Compatibility attributes (needed for now)
-        self.translation_config = config.get("translation", {})
-        self.performance_config = config.get("performance", {})
+        self.translation_config = self.config.get("translation", {})
+        self.performance_config = self.config.get("performance", {})
         self.delay_between_requests = self.performance_config.get("delay_between_requests", 1.0)
         self.rate_limit_backoff_delay = self.performance_config.get("rate_limit_backoff_delay", 10)
         self.enable_final_cleanup_pass = self.translation_config.get("enable_final_cleanup_pass", False)
@@ -1395,6 +1394,9 @@ class NovelTranslator:
         Returns:
             Tuple[List[Dict], Optional[str]]: (all_chunks, cleaned_text) hoặc ([], None) nếu lỗi
         """
+        _prep_t0 = time.perf_counter()
+        _prep_strategy = (self.config.get("preprocessing") or {}).get("strategy") or "legacy"
+
         # EPUB layout-preservation branch
         if self._epub_preserve_layout and self.novel_path.lower().endswith(".epub"):
             from src.preprocessing.chunker_epub import build_chunks_from_text_map
@@ -1430,23 +1432,53 @@ class NovelTranslator:
                     return [], None
 
                 logger.info(f"📦 [EPUB Layout] Đã chia thành {len(all_chunks)} chunks từ TEXT_MAP, sẵn sàng dịch.")
+                _prep_ms = (time.perf_counter() - _prep_t0) * 1000.0
+                logger.info(
+                    "Preprocess metrics: strategy=%s path=epub_layout text_map_entries=%d chunks=%d elapsed_ms=%.1f",
+                    _prep_strategy,
+                    len(text_map),
+                    len(all_chunks),
+                    _prep_ms,
+                )
                 # cleaned_text không còn ý nghĩa trong chế độ EPUB layout
                 return all_chunks, None
 
         # Fallback / luồng cũ: xử lý như TXT
-        from src.preprocessing.file_parser import parse_file
+        from src.preprocessing.file_parser import parse_file_advanced
+        from src.preprocessing.semantic_enrichment import enrich_structured_ir
         from src.preprocessing.text_cleaner import clean_text
 
         logger.info(f"Đang đọc và tiền xử lý tệp tiểu thuyết: {self.novel_path}")
-        raw_text = parse_file(self.novel_path, self.config)
-        cleaned_text = clean_text(raw_text)
-        all_chunks = self.chunker.chunk_novel(cleaned_text)
+        parsed = parse_file_advanced(self.novel_path, self.config)
+        raw_text = parsed.get("text", "")
+        cleaned_text = clean_text(raw_text, self.config)
+        structured_ir = parsed.get("structured_ir") or []
+        if structured_ir:
+            for block in structured_ir:
+                block_text = (block.get("text") or "").strip()
+                if not block_text:
+                    continue
+                block["text"] = clean_text(block_text, self.config)
+            structured_ir = enrich_structured_ir(structured_ir, self.config)
+            all_chunks = self.chunker.chunk_from_structured_ir(structured_ir)
+        else:
+            all_chunks = self.chunker.chunk_novel(cleaned_text)
 
         if len(all_chunks) == 0:
             logger.warning("Không tìm thấy nội dung nào để chia chunk.")
             return [], None
 
         logger.info(f"📦 Đã chia thành {len(all_chunks)} chunks, sẵn sàng dịch.")
+        _prep_ms = (time.perf_counter() - _prep_t0) * 1000.0
+        _chunk_mode = "structured_ir" if structured_ir else "plain"
+        logger.info(
+            "Preprocess metrics: strategy=%s path=flat chunk_mode=%s structured_ir_blocks=%d chunks=%d elapsed_ms=%.1f",
+            _prep_strategy,
+            _chunk_mode,
+            len(structured_ir) if structured_ir else 0,
+            len(all_chunks),
+            _prep_ms,
+        )
         return all_chunks, cleaned_text
 
     async def _execute_translation(self, all_chunks: List[Dict]) -> Tuple[List[Dict], float]:

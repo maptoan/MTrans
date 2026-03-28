@@ -63,6 +63,7 @@ class AdvancedTextCleaner:
         self.cleaning_config = (self.config.get("preprocessing") or {}).get(
             "cleaning"
         ) or {}
+        self.cleaning_profile = str(self.cleaning_config.get("profile", "safe")).strip().lower()
         # Phase 1.3: Advanced whitespace normalization config
         translation_config = self.config.get("translation", {})
         self.advanced_whitespace = translation_config.get(
@@ -127,6 +128,10 @@ class AdvancedTextCleaner:
 
     def remove_urls_and_emails(self, text: str) -> str:
         """Loại bỏ URLs và emails (thường là noise trong ebooks)."""
+        # domain_technical profile keeps links/emails for references and reproducibility.
+        if self.cleaning_profile == "domain_technical":
+            return text
+
         # Remove URLs
         url_count = len(URL_PATTERN.findall(text))
         text = URL_PATTERN.sub("", text)
@@ -297,7 +302,8 @@ class AdvancedTextCleaner:
         text = self.remove_zero_width_chars(text)
         text = self.normalize_unicode(text)
         text = self.remove_urls_and_emails(text)
-        text = self.remove_page_numbers(text)
+        if self.cleaning_profile == "aggressive":
+            text = self.remove_page_numbers(text)
 
         # Phase 1.3: Advanced whitespace normalization nếu enabled
         if self.advanced_whitespace:
@@ -305,7 +311,8 @@ class AdvancedTextCleaner:
         else:
             text = self.normalize_whitespace(text)
 
-        text = self.fix_punctuation_spacing(text)
+        if self.cleaning_profile != "domain_technical":
+            text = self.fix_punctuation_spacing(text)
         text = self.remove_duplicate_lines(text)
 
         # Preserve chapter markers

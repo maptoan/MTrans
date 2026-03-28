@@ -82,6 +82,7 @@ async def detect_and_preprocess_input(
         load_ocr_config(config.get("config_path", "config/config.yaml"))
     )
     
+    pdf_type = None
     # Chỉ detect PDF type nếu là file PDF
     if ext == ".pdf":
         start_detect = time.time()
@@ -129,6 +130,7 @@ async def detect_and_preprocess_input(
             pages=None,
             output_path=str(processed_file),
             skip_steps={},
+            pdf_type=pdf_type,
             skip_completion_menu=True,
             key_manager=key_manager,
         )

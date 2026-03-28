@@ -1,7 +1,7 @@
 # Documentation Index - MTranslator
 
-**Phiên bản hiện tại:** v9.4 STABLE  
-**Cập nhật lần cuối:** 2026-03-27
+**Phiên bản hiện tại:** v9.5 + Unreleased (OCR / preprocessing)  
+**Cập nhật lần cuối:** 2026-03-28
 
 ---
 

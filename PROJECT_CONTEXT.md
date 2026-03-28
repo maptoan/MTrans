@@ -2,8 +2,8 @@
 
 > **Mục đích:** File này tổng hợp toàn bộ thông tin quan trọng về dự án để AI có thể nắm bắt lại ngay khi quay trở lại.
 
-**Cập nhật lần cuối:** 2026-03-27  
-**Phiên bản hiện tại:** v9.5 (2026-03-27) - STABLE
+**Cập nhật lần cuối:** 2026-03-28  
+**Phiên bản hiện tại:** v9.5 (2026-03-27) - STABLE — *tháng 3/2026: đã siết chia chunk khi dùng Structured IR*
 
 ---
 
@@ -37,6 +37,15 @@ Công cụ dịch tiểu thuyết/tài liệu tự động sử dụng Gemini AP
   - Tùy chọn khác theo nhu cầu (A/B test profile, thêm profile tùy biến).
   - Tối ưu hóa hiệu năng nạp CSS.
   - Duy trì đồng bộ tài liệu lõi và script khởi chạy/backup theo path contract.
+
+### **Chia nhỏ văn khi dùng Structured IR (cập nhật 2026-03-28)**
+
+- Khi bật cấu trúc IR, chương trình gom theo tiêu đề rồi chia nhỏ. Nếu một đoạn vẫn quá dài (ví dụ PDF ít dấu chấm phẩy), sẽ **cắt thêm theo độ dài** rồi **kiểm tra lần cuối** để mỗi mảnh không vượt ngưỡng an toàn đã cấu hình.
+
+### **OCR PDF scan (cập nhật 2026-03-28)**
+
+- **Bộ nhớ:** Không còn render cả quyển PDF vào RAM qua stdout của Poppler. Mỗi trang ghi file tạm (JPEG/PNG theo `ocr.image_format`), OCR bằng Tesseract, xóa file trước trang sau.
+- **Ngôn ngữ:** Trong `config`, `ocr.lang` có thể dùng dạng ngắn `EN`, `VN`, `CN+EN` — chuỗi được map sang `eng`, `vie`, v.v. trước khi gọi Tesseract (không dùng nhầm `EN.traineddata`).
 
 ### **Marker Guardrail (Unreleased) — Bảo toàn tính toàn vẹn chunk**
 
@@ -85,7 +94,7 @@ MTranslator/
 │   ├── preprocessing/        # Input processing
 │   │   ├── file_parser.py    # Parse TXT/EPUB/DOCX/PDF
 │   │   ├── text_cleaner.py   # Clean text
-│   │   ├── chunker.py        # SmartChunker (paragraph-aware)
+│   │   ├── chunker.py        # SmartChunker — chia đoạn; nhánh IR có cắt theo ngưỡng khi đoạn quá dài
 │   │   ├── ocr_reader.py     # OCR module (QUAN TRỌNG)
 │   │   └── input_preprocessor.py  # Detect & preprocess input
 │   ├── managers/             # Metadata managers
