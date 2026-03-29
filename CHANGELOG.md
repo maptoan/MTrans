@@ -7,6 +7,7 @@
   - `convert_pdf_with_ocrmypdf`: không capture stdout vô hạn vào RAM.
   - `_resolve_language` luôn gọi `_normalize_lang_code` trước — `EN`/`VN` trong config map đúng sang `eng`/`vie` (file `.traineddata` của Tesseract).
   - Config: `ocr.pdf_ocr_progress_every`, dùng `ocr.image_format` / `ocr.jpeg_quality` cho ảnh trung gian.
+  - **Song song:** worker Tesseract theo CPU + `tesseract_max_workers` / `tesseract_workers_per_cpu` (không scale theo số Gemini key); `performance.max_parallel_workers` chỉ khi `ocr.tesseract_cap_from_performance`; ghép text theo đúng thứ tự trang.
   - Test: `tests/test_ocr_pdf_disk_render.py`, `tests/test_ocr_language_normalize.py`.
 
 - ✅ **Structured IR — không còn mảnh dịch quá lớn:**

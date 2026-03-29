@@ -24,12 +24,11 @@ def test_ocr_pdf_writes_each_page_to_output_folder(
 ) -> None:
     import src.preprocessing.ocr.pdf_processor as pdfp
 
-    mock_convert = MagicMock(
-        side_effect=[
-            [str(Path("/tmp/mt_ocr_test/w000001/fake1.jpg"))],
-            [str(Path("/tmp/mt_ocr_test/w000002/fake2.jpg"))],
-        ]
-    )
+    def _convert_fake(*_a: object, **kwargs: object) -> list[str]:
+        p = int(kwargs["first_page"])
+        return [str(Path(f"/tmp/mt_ocr_test/w{p:06d}/fake.jpg"))]
+
+    mock_convert = MagicMock(side_effect=_convert_fake)
     cm = MagicMock()
     cm.__enter__.return_value = cm
     cm.__exit__.return_value = None
@@ -48,7 +47,11 @@ def test_ocr_pdf_writes_each_page_to_output_folder(
         ),
         patch(
             "src.preprocessing.ocr.config_loader.load_ocr_config",
-            return_value={"dpi": 200, "lang": "eng"},
+            return_value={
+                "dpi": 200,
+                "lang": "eng",
+                "pdf_ocr_max_workers": 1,
+            },
         ),
     ):
         text, n = pdfp.ocr_pdf("dummy.pdf", config_path="config/config.yaml", pages=None)
@@ -60,3 +63,51 @@ def test_ocr_pdf_writes_each_page_to_output_folder(
         assert kwargs.get("output_folder") is not None
         assert kwargs.get("paths_only") is True
         assert kwargs.get("first_page") == kwargs.get("last_page")
+
+
+def test_resolve_pdf_ocr_max_workers_caps_by_page_count() -> None:
+    from src.preprocessing.ocr.pdf_processor import _resolve_pdf_ocr_max_workers
+
+    assert _resolve_pdf_ocr_max_workers({"pdf_ocr_max_workers": 99}, 2) == 2
+    assert _resolve_pdf_ocr_max_workers({"pdf_ocr_max_workers": 1}, 500) == 1
+
+
+def test_resolve_pdf_ocr_max_workers_falls_back_to_performance_when_flagged() -> None:
+    from src.preprocessing.ocr.pdf_processor import _resolve_pdf_ocr_max_workers
+
+    cfg = {
+        "_root_performance": {"max_parallel_workers": 3},
+        "tesseract_cap_from_performance": True,
+    }
+    assert _resolve_pdf_ocr_max_workers(cfg, 100) == 3
+    assert _resolve_pdf_ocr_max_workers(cfg, 2) == 2
+
+
+def test_resolve_pdf_ocr_ignores_performance_without_flag() -> None:
+    from unittest.mock import patch
+
+    from src.preprocessing.ocr.pdf_processor import _resolve_pdf_ocr_max_workers
+
+    cfg = {"_root_performance": {"max_parallel_workers": 3}}
+    with patch("src.preprocessing.ocr.pdf_processor.os.cpu_count", return_value=8):
+        assert _resolve_pdf_ocr_max_workers(cfg, 100) == 8
+
+
+def test_resolve_pdf_ocr_tesseract_max_workers_hard_cap() -> None:
+    from unittest.mock import patch
+
+    from src.preprocessing.ocr.pdf_processor import _resolve_pdf_ocr_max_workers
+
+    cfg = {"tesseract_max_workers": 2}
+    with patch("src.preprocessing.ocr.pdf_processor.os.cpu_count", return_value=16):
+        assert _resolve_pdf_ocr_max_workers(cfg, 100) == 2
+
+
+def test_resolve_pdf_ocr_workers_per_cpu() -> None:
+    from unittest.mock import patch
+
+    from src.preprocessing.ocr.pdf_processor import _resolve_pdf_ocr_max_workers
+
+    cfg = {"tesseract_workers_per_cpu": 0.5, "tesseract_max_workers": 8}
+    with patch("src.preprocessing.ocr.pdf_processor.os.cpu_count", return_value=4):
+        assert _resolve_pdf_ocr_max_workers(cfg, 100) == 2

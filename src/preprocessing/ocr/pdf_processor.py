@@ -6,7 +6,7 @@ import logging
 import os
 import shutil
 import tempfile
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -284,14 +284,53 @@ def _normalize_pdf_ocr_page_list(
     return list(range(1, total + 1))
 
 
+def _resolve_pdf_ocr_max_workers(ocr_cfg: Dict[str, Any], num_pages: int) -> int:
+    """
+    Bounded parallelism for local Tesseract (CPU + OCR-only caps).
+
+    Does not scale with API key count. ``performance.max_parallel_workers`` is used
+    only when ``tesseract_cap_from_performance: true`` (e.g. legacy / shared cap).
+    """
+    perf = ocr_cfg.get("_root_performance") or {}
+    cpu = os.cpu_count() or 4
+
+    tess_max = ocr_cfg.get("tesseract_max_workers")
+    hard_cap = 8 if tess_max is None else max(1, int(tess_max))
+
+    wpc = ocr_cfg.get("tesseract_workers_per_cpu")
+    if wpc is None:
+        cpu_cap = max(1, min(hard_cap, cpu))
+    else:
+        cpu_cap = max(1, min(hard_cap, int(float(wpc) * cpu)))
+
+    raw = ocr_cfg.get("pdf_ocr_max_workers")
+    if raw is None:
+        n = cpu_cap
+        if bool(ocr_cfg.get("tesseract_cap_from_performance", False)):
+            perf_w = perf.get("max_parallel_workers")
+            if perf_w is not None:
+                n = max(1, min(n, int(perf_w)))
+    else:
+        n = max(1, int(raw))
+        n = min(n, hard_cap, cpu_cap)
+        if bool(ocr_cfg.get("tesseract_cap_from_performance", False)):
+            perf_w = perf.get("max_parallel_workers")
+            if perf_w is not None:
+                n = max(1, min(n, int(perf_w)))
+
+    return min(n, max(1, num_pages))
+
+
 def ocr_pdf(
     pdf_path: str, config_path: str = "config/config.yaml", pages: Optional[List[int]] = None
 ) -> tuple[str, int]:
     """
-    OCR scan PDF: render each page to disk, then OCR one image at a time.
+    OCR scan PDF: render each page to disk, then OCR with a bounded thread pool.
 
     pdf2image without output_folder buffers Poppler stdout in memory; large
     PDFs cause MemoryError. Per-page output_folder + paths_only avoids that.
+    Pages may process in parallel (``ocr.pdf_ocr_max_workers``); output order
+    follows the original page list.
     """
     from PIL import Image
 
@@ -326,47 +365,68 @@ def ocr_pdf(
     if not page_list:
         return "", 0
 
-    log_every = max(1, int(ocr_cfg.get("pdf_ocr_progress_pages", 25) or 25))
-    texts: List[str] = []
+    log_every = max(1, int(ocr_cfg.get("pdf_ocr_progress_every", 25) or 25))
+    max_workers = _resolve_pdf_ocr_max_workers(ocr_cfg, len(page_list))
+    logger.info(
+        f"OCR scan PDF: {len(page_list)} trang, tối đa {max_workers} worker Tesseract song song"
+    )
+
     work_root = tempfile.mkdtemp(prefix="mtranslator_pdf_ocr_")
 
-    try:
-        for idx, page_num in enumerate(page_list):
-            page_dir = os.path.join(work_root, f"w{page_num:06d}")
-            os.makedirs(page_dir, exist_ok=True)
-            try:
-                image_paths: List[str] = convert_from_path(
-                    pdf_path,
-                    dpi=dpi,
-                    first_page=page_num,
-                    last_page=page_num,
-                    output_folder=page_dir,
-                    fmt=fmt,
-                    paths_only=True,
-                    thread_count=1,
-                    poppler_path=poppler,
-                    userpw=userpw,
-                    jpegopt=jpegopt if fmt == "jpeg" else None,
-                )
-                for img_path in image_paths:
+    def process_one_page(page_num: int) -> Tuple[int, str]:
+        """Render one page to disk, OCR, return (page_num, text)."""
+        page_dir = os.path.join(work_root, f"w{page_num:06d}")
+        os.makedirs(page_dir, exist_ok=True)
+        parts: List[str] = []
+        try:
+            image_paths: List[str] = convert_from_path(
+                pdf_path,
+                dpi=dpi,
+                first_page=page_num,
+                last_page=page_num,
+                output_folder=page_dir,
+                fmt=fmt,
+                paths_only=True,
+                thread_count=1,
+                poppler_path=poppler,
+                userpw=userpw,
+                jpegopt=jpegopt if fmt == "jpeg" else None,
+            )
+            for img_path in image_paths:
+                try:
+                    with Image.open(img_path) as im:
+                        parts.append(_image_to_text(im, ocr_cfg))
+                finally:
                     try:
-                        with Image.open(img_path) as im:
-                            text = _image_to_text(im, ocr_cfg)
-                            texts.append(text)
-                    finally:
-                        try:
-                            os.remove(img_path)
-                        except OSError:
-                            pass
-            finally:
-                shutil.rmtree(page_dir, ignore_errors=True)
+                        os.remove(img_path)
+                    except OSError:
+                        pass
+        finally:
+            shutil.rmtree(page_dir, ignore_errors=True)
+        return page_num, "\n".join(parts)
 
-            if (idx + 1) % log_every == 0 or idx + 1 == len(page_list):
-                logger.info(f"OCR scan PDF: đã xử lý {idx + 1}/{len(page_list)} trang")
-
-            gc.collect()
-
+    results: Dict[int, str] = {}
+    try:
+        if max_workers <= 1:
+            for idx, p in enumerate(page_list):
+                pn, tx = process_one_page(p)
+                results[pn] = tx
+                if (idx + 1) % log_every == 0 or idx + 1 == len(page_list):
+                    logger.info(f"OCR scan PDF: đã xử lý {idx + 1}/{len(page_list)} trang")
+                gc.collect()
+        else:
+            done = 0
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(process_one_page, p) for p in page_list]
+                for fut in as_completed(futures):
+                    page_num, text = fut.result()
+                    results[page_num] = text
+                    done += 1
+                    if done % log_every == 0 or done == len(page_list):
+                        logger.info(f"OCR scan PDF: đã xử lý {done}/{len(page_list)} trang")
+                    gc.collect()
     finally:
         shutil.rmtree(work_root, ignore_errors=True)
 
-    return "\n\n".join(texts), len(page_list)
+    texts_ordered = [results[p] for p in page_list]
+    return "\n\n".join(texts_ordered), len(page_list)

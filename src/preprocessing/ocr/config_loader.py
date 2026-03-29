@@ -88,6 +88,7 @@ def load_ocr_config(config_path: str = "config/config.yaml") -> Dict[str, Any]:
     # Ưu tiên: ocr.safety_level > root safety_level > default BLOCK_ONLY_HIGH
     if "safety_level" not in ocr_cfg:
         ocr_cfg["safety_level"] = cfg.get("safety_level", "BLOCK_ONLY_HIGH")
+    ocr_cfg["_root_performance"] = cfg.get("performance", {}) or {}
     return ocr_cfg
 
 

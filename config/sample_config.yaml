@@ -146,6 +146,21 @@ preprocessing:
     target_utilization: 0.85
     min_utilization: 0.75
 
+# --- 6b) OCR (PDF scan / Tesseract) ---
+# Song song Tesseract (local, không dùng API key): bị chặn theo CPU + các trần dưới đây,
+# KHÔNG nhân với số Gemini key. Pool key chỉ áp dụng cho bước dịch / AI cleanup / spell-check.
+#
+# pdf_ocr_max_workers: (tuỳ chọn) số worker mục tiêu; vẫn bị min với tesseract_max_workers,
+#   cpu_cap (tesseract_workers_per_cpu × CPU), và số trang.
+# tesseract_max_workers: trần cứng worker OCR (mặc định 8 nếu bỏ trống).
+# tesseract_workers_per_cpu: hệ số × số CPU (mặc định: hành vi cũ min(CPU, tesseract_max_workers)).
+# tesseract_cap_from_performance: true = thêm min(performance.max_parallel_workers) (legacy / dùng chung trần).
+ocr:
+  pdf_ocr_max_workers: 4
+  # tesseract_max_workers: 8
+  # tesseract_workers_per_cpu: 1.0
+  # tesseract_cap_from_performance: false
+
 # --- 7) TRANSLATION ---
 # Bản mẫu dùng flash_only + tắt các pass hậu kỳ để chạy nhanh.
 translation:

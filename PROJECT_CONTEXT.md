@@ -46,6 +46,7 @@ Công cụ dịch tiểu thuyết/tài liệu tự động sử dụng Gemini AP
 
 - **Bộ nhớ:** Không còn render cả quyển PDF vào RAM qua stdout của Poppler. Mỗi trang ghi file tạm (JPEG/PNG theo `ocr.image_format`), OCR bằng Tesseract, xóa file trước trang sau.
 - **Ngôn ngữ:** Trong `config`, `ocr.lang` có thể dùng dạng ngắn `EN`, `VN`, `CN+EN` — chuỗi được map sang `eng`, `vie`, v.v. trước khi gọi Tesseract (không dùng nhầm `EN.traineddata`).
+- **Song song:** OCR từng trang qua `ThreadPoolExecutor` — `ocr.pdf_ocr_max_workers` (tuỳ chọn) cùng trần CPU/config (`tesseract_max_workers`, `tesseract_workers_per_cpu`); tùy chọn `tesseract_cap_from_performance` để min với `performance.max_parallel_workers`. Ghép text đúng thứ tự trang (không liên quan pool API key).
 
 ### **Marker Guardrail (Unreleased) — Bảo toàn tính toàn vẹn chunk**
 
