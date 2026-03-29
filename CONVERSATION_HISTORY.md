@@ -2,8 +2,27 @@
 
 **Last session:** 2026-03-28  
 **Branch:** `master` (máy bạn — push khi cần)  
-**Tests pass:** ✅ Phần test về chunk (semantic + hybrid) chạy được. Cả bộ `pytest` vẫn có chỗ lỗi cũ (dịch bất đồng bộ, thư mục legacy…) — **không** phải do sửa chunk lần này.  
-**Việc tiếp:** Push `origin` khi sẵn sàng; chạy `pytest` theo nhóm nếu cần.
+**Tests pass:** ✅ `pytest tests/test_ocr_pdf_disk_render.py` — 6/6. Cả bộ `pytest` vẫn có lỗi cũ (async, legacy…) — không do commit OCR worker `285c69a`.  
+**Việc tiếp:** Push `origin` khi cần; chạy regression theo nhóm trước release.
+
+---
+
+## [2026-03-28] - Handover: Tách worker Tesseract PDF khỏi pool Gemini key
+
+**Trạng thái:** ✅ Hoàn thành — **commit `285c69a`** (`feat(ocr): decouple Tesseract PDF workers from API key pool`)
+
+### **Đã làm**
+- **`_resolve_pdf_ocr_max_workers`** (`src/preprocessing/ocr/pdf_processor.py`): song song OCR scan theo CPU + `tesseract_max_workers` / `tesseract_workers_per_cpu`; **không** scale theo số API key. `performance.max_parallel_workers` chỉ áp khi **`ocr.tesseract_cap_from_performance: true`**.
+- **`load_ocr_config`:** gắn `_root_performance` vào `ocr_cfg`.
+- **Test:** `tests/test_ocr_pdf_disk_render.py` — bổ sung / điều chỉnh (cờ performance, hard cap, `workers_per_cpu`).
+- **Docs:** `CHANGELOG.md`, `PROJECT_CONTEXT.md`, `config/sample_config.yaml` (mô tả khóa mới).
+
+### **Quyết định / lưu ý**
+- `pdf_ocr_max_workers` chỉ điều khiển **Tesseract trên máy**, không “khai thác” thêm Gemini key; nhiều key dùng cho dịch / `ai_cleanup` / spell-check (`min(max_parallel, len(keys))`).
+
+### **Chưa làm / bước sau**
+- Full `pytest` toàn repo nếu cần chốt release; push remote khi user muốn.
+- Ai từng **phụ thuộc** fallback `performance.max_parallel_workers` cho OCR mà **không** set `pdf_ocr_max_workers`: mặc định giờ theo CPU — bật `tesseract_cap_from_performance` hoặc set rõ `pdf_ocr_max_workers` / `tesseract_max_workers`.
 
 ---
 

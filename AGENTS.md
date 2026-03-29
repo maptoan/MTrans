@@ -16,12 +16,13 @@
 - **Quality:** Phải đạt 100% Checklist mới được phép commit.
 
 ## 🔄 Active Status (Trang thai hien tai)
-- **Last Task:** Handover 2026-03-28 — Structured IR chunking tuân `max_effective_tokens` + benchmark ScienceOfRunning.pdf.
-- **Current Pipeline:** v9.5 docs baseline + chunk IR cap (preprocessing).
-- **Active Issues:** Full pytest vẫn có fail sẵn (async/legacy); chunk subset OK.
-- **Phien ban hien tai:** v9.5 (docs) + Unreleased chunk IR fix
+- **Last Task:** Handover 2026-03-28 — OCR PDF: worker Tesseract tách khỏi pool Gemini key (`285c69a`).
+- **Current Pipeline:** v9.5 baseline + chunk IR + OCR parallel theo CPU/config (không nhân với số key).
+- **Active Issues:** Full pytest vẫn có fail sẵn (async/legacy); subset OCR disk render 6/6 OK.
+- **Phien ban hien tai:** v9.5 + Unreleased (chunk IR + OCR worker decouple)
 
 ## 🧠 Shared Memory (Ghi nho cho cac Agent)
+- [2026-03-28] **OCR PDF workers:** `pdf_ocr_max_workers` / `tesseract_*` = Tesseract local; không dùng key. Muốn min với `performance.max_parallel_workers` → `tesseract_cap_from_performance: true`.
 - [2026-03-28] **Chia chunk IR**: Không để mảnh quá dài; markdown sau OCR chỉ hợp PDF quét; PDF nhiều cột/chữ trong ảnh cần xử lý riêng (OCR/xuất file).
 - [2026-03-19] **v9.2 Stable**: Unified layout (Tables/Headings/Images) & Quality Audit for English sources.
 - [2026-02-26] **v8.3 Stable**: Workflow optimization, enable final_cleanup_pass, residual_cleanup.py fix.

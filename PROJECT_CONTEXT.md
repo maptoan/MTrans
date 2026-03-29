@@ -3,6 +3,7 @@
 > **Mục đích:** File này tổng hợp toàn bộ thông tin quan trọng về dự án để AI có thể nắm bắt lại ngay khi quay trở lại.
 
 **Cập nhật lần cuối:** 2026-03-28  
+**Bàn giao gần nhất:** OCR scan — worker Tesseract độc lập với pool API key; commit `285c69a`.  
 **Phiên bản hiện tại:** v9.5 (2026-03-27) - STABLE — *tháng 3/2026: đã siết chia chunk khi dùng Structured IR*
 
 ---
