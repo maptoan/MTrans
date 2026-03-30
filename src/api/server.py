@@ -6,8 +6,9 @@ import os
 from typing import Dict, List, Optional
 
 import yaml
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
 app = FastAPI(title="Novel Translator API Bridge")
@@ -23,18 +24,29 @@ app.add_middleware(
 
 CONFIG_PATH = "config/config.yaml"
 
+# Define API key header
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def get_api_key(api_key: str = Security(api_key_header)):
+    expected_api_key = os.getenv("API_KEY")
+    if not expected_api_key:
+        raise HTTPException(status_code=500, detail="API_KEY environment variable not set on server.")
+    if api_key != expected_api_key:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
+    return api_key
+
 class ConfigUpdate(BaseModel):
     section: str
     data: Dict
 
-@app.get("/config")
+@app.get("/config", dependencies=[Depends(get_api_key)])
 def get_config():
     if not os.path.exists(CONFIG_PATH):
         raise HTTPException(status_code=404, detail="Config file not found")
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
-@app.post("/config")
+@app.post("/config", dependencies=[Depends(get_api_key)])
 def update_config(update: ConfigUpdate):
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
